@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Login — Chess AI</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="stylesheet" href="style.css?v=1.1" />
+</head>
+<body>
+    <div class="container screen active">
+        <h1>Welcome to Chess AI</h1>
+        <p class="subtitle">Login to play</p>
+        <div class="form-group">
+            <input type="text" id="username" placeholder="Username" autocomplete="off" />
+        </div>
+        <div class="form-group">
+            <input type="password" id="password" placeholder="Password" />
+        </div>
+        <div class="auth-buttons">
+            <button id="btn-login" class="primary">Login</button>
+            <a href="signup.html" style="text-align: center; color: #888; text-decoration: none; margin-top: 10px;">Need an account? Sign up</a>
+        </div>
+        <p id="error-msg" style="display: none;"></p>
+    </div>
+
+    <script>
+        if (localStorage.getItem('chess_user')) {
+            window.location.href = 'game.html';
+        }
+
+        document.getElementById('btn-login').addEventListener('click', async () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const err = document.getElementById('error-msg');
+            
+            if (!username || !password) {
+                err.textContent = 'Please enter both username and password.';
+                err.style.display = 'block';
+                return;
+            }
+
+            let res;
+            let raw = '';
+            try {
+                res = await fetch('login.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                raw = await res.text();
+                
+                let data;
+                try {
+                    const jsonStart = raw.indexOf('{');
+                    const jsonEnd = raw.lastIndexOf('}');
+                    data = JSON.parse(jsonStart > -1 && jsonEnd > -1 ? raw.substring(jsonStart, jsonEnd + 1) : raw);
+                } catch(e) {
+                    throw new Error('Host blocked the request or returned invalid JSON.');
+                }
+
+                if (data.success) {
+                    localStorage.setItem('chess_user', username);
+                    window.location.href = 'game.html';
+                } else {
+                    err.textContent = data.message;
+                    err.style.display = 'block';
+                }
+            } catch (error) {
+                err.innerHTML = 'Cannot connect to server. Error: ' + error.message;
+                err.style.display = 'block';
+                // Show raw response for debugging
+                if (raw) {
+                    console.log('RAW RESPONSE:', raw);
+                    err.innerHTML += '<br><br>Raw server response:<br><pre style="font-size:0.7rem;text-align:left;background:#111;padding:8px;border-radius:4px;max-height:200px;overflow:auto;">' + raw.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

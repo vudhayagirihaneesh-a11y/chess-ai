@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Chess AI — A tool by Haneesh</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css" />
+    <link rel="stylesheet" href="style.css?v=1.1" />
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading AI engine…</p>
+    </div>
+
+    <div id="reconnect-toast">
+        <div class="small-spinner"></div>
+        <span>Connection lost. Reconnecting...</span>
+    </div>
+
+    <!-- ── Lobby Screen ── -->
+    <div id="lobby-screen" class="container screen active">
+        <h1>Lobby</h1>
+        <p class="subtitle">Welcome, <span id="user-display" style="color:white;font-weight:bold;">User</span>!</p>
+
+        <div class="lobby-buttons">
+            <button id="btn-solo" class="primary">Play vs AI (Bot)</button>
+            <button id="btn-multi-random" class="primary" style="background-color: #d97706;">Find Random Match</button>
+            
+            <div style="margin-top: 5px; border-top: 1px solid #3c3a38; padding-top: 15px;">
+                <p style="text-align: center; color: #bababa; font-size: 0.9rem; margin-bottom: 10px; font-weight: 600;">👥 Play with a Friend</p>
+                <div style="display: flex; gap: 8px;">
+                    <button id="btn-multi-friend" style="flex: 1; background-color: #4a4846;">Create Room</button>
+                    <button id="btn-show-join" style="flex: 1; background-color: #4a4846;">Join Room</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 5px; border-top: 1px solid #3c3a38; padding-top: 15px;">
+                <p style="text-align: center; color: #bababa; font-size: 0.9rem; margin-bottom: 10px; font-weight: 600;">📺 Spectate & Broadcast</p>
+                <div style="display: flex; gap: 8px;">
+                    <button id="btn-create-broadcast" style="flex: 1; background-color: #4a4846;">Create Broadcast</button>
+                    <button id="btn-show-watch" style="flex: 1; background-color: #4a4846;">Watch Broadcast</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="otp-section" style="display: none; margin-top: 20px;">
+            <p style="text-align:center; color:#aaa; font-size: 0.9rem;" id="otp-instruction">Share this OTP with a friend to watch:</p>
+            <div class="otp-display" id="generated-otp">----</div>
+            <p style="text-align:center; color:#8f8; font-size: 0.9rem; margin-bottom: 10px;" id="waiting-msg">Waiting for spectator to join...</p>
+            <button id="btn-start-hosted" class="primary" style="width: 100%;">Start Match</button>
+            <button id="btn-cancel-room" class="danger" style="width: 100%; display: none; margin-top: 10px;">Cancel</button>
+        </div>
+
+        <div id="join-section" style="display: none;">
+            <hr style="border-top: 1px solid #3c3a38; border-bottom: 0; margin: 20px 0 15px 0;" />
+            <p style="text-align:center; color:#bababa; font-size: 0.9rem; margin-bottom: 10px;">Enter friend's OTP to play:</p>
+            <div class="form-group">
+                <input type="text" id="join-otp" placeholder="Enter Room OTP" />
+            </div>
+            <button id="btn-join-multi" class="primary" style="width: 100%;">Join Match</button>
+        </div>
+
+        <div id="watch-section" style="display: none;">
+            <hr style="border-top: 1px solid #3c3a38; border-bottom: 0; margin: 20px 0 15px 0;" />
+            <p style="text-align:center; color:#bababa; font-size: 0.9rem; margin-bottom: 10px;">Enter broadcast OTP to spectate:</p>
+            <div class="form-group">
+                <input type="text" id="watch-otp" placeholder="Broadcast OTP" />
+            </div>
+            <button id="btn-join-broadcast" class="primary" style="width: 100%;">Watch Broadcast</button>
+        </div>
+
+        <div id="leaderboard-section" style="margin-top: 30px; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; text-align: left;">
+            <h3 style="margin-top:0; color: #fff; border-bottom: 1px solid #444; padding-bottom: 10px; font-size: 1.1rem;">🏆 Top Players</h3>
+            <ul id="leaderboard-list" style="list-style: none; padding: 0; margin: 0; color: #ccc; font-size: 0.95rem;">
+                <li style="text-align: center; padding: 10px 0;">Loading...</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 25px;">
+            <a href="#" id="btn-logout" style="color: #888; text-decoration: none; font-size: 0.85rem;">Logout</a>
+        </div>
+    </div>
+
+    <!-- ── Game Screen ── -->
+    <div id="game-screen" class="container screen">
+        <h1>♚ Chess AI</h1>
+        <p class="subtitle">A tool made by Haneesh</p>
+        <p id="broadcast-status" style="text-align:center; color:#8f8; font-size: 0.85rem; display:none; margin-bottom: 10px;"></p>
+
+        <div id="status-bar">Initializing engine…</div>
+        <div id="eval-container">
+            <div id="eval-bar"></div>
+            <div id="eval-text">0.00</div>
+        </div>
+
+        <div id="player-top" class="player-info">
+            <div>
+                <span id="top-name">Opponent</span>
+                <span id="top-status" style="display:none; color: #81b64c; font-size: 0.8em; margin-left: 4px;">●</span>
+            </div>
+            <span id="captured-top" class="captured-pieces"></span>
+        </div>
+
+        <div id="board-wrapper">
+            <div id="board"></div>
+        </div>
+
+        <div id="player-bottom" class="player-info">
+            <div>
+                <span id="bottom-name">You</span>
+            </div>
+            <span id="captured-bottom" class="captured-pieces"></span>
+        </div>
+
+        <div class="controls">
+            <button id="btn-white" class="primary">Play as White</button>
+            <button id="btn-black">Play as Black</button>
+            <button id="btn-restart" class="danger">⟳ Restart</button>
+            <button id="btn-abandon" class="danger" style="display: none;">⚑ Abandon Match</button>
+        </div>
+
+        <div id="move-log">—</div>
+    </div>
+
+    <!-- ── Dependencies ── -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+
+    <script>
+        (function () {
+            'use strict';
+
+            const username = localStorage.getItem('chess_user');
+            if (!username) {
+                window.location.href = 'index.html';
+                return;
+            }
+            $('#user-display').text(username);
+
+            // ── Game State ──
+            const game = new Chess();
+            let board = null;
+            let stockfishWorker = null;
+            let humanColor = 'w';
+            let gameOver = false;
+            let aiThinking = false;
+
+            // ── Broadcast State ──
+            let currentOtp = null;
+            let isHost = true;
+            let broadcastMode = false;
+            let multiplayerMode = false;
+            let userElo = 1200;
+            let opponentUsername = 'Opponent';
+            let pollTimer = null;
+            let lastMoveCount = 0;
+            let serverChessMoveCount = 0;
+            let isProcessingPollMove = false;
+            let missedHeartbeats = 0;
+            let selectedSquare = null;
+
+            const moveSound = new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3');
+            const captureSound = new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3');
+
+            function unlockAudio() {
+                moveSound.play().then(() => { moveSound.pause(); moveSound.currentTime = 0; }).catch(()=>{});
+                captureSound.play().then(() => { captureSound.pause(); captureSound.currentTime = 0; }).catch(()=>{});
+                $(document).off('click', unlockAudio);
+            }
+            $(document).on('click', unlockAudio);
+
+            const $status = $('#status-bar');
+            const $log = $('#move-log');
+            const $overlay = $('#loading-overlay');
+            const $broadcastStatus = $('#broadcast-status');
+
+            function setStatus(text, cls) {
+                $status.text(text).removeClass('thinking checkmate draw');
+                if (cls) $status.addClass(cls);
+            }
+
+            async function fetchProfile() {
+                try {
+                    const res = await fetch('api_profile.php', { method: 'POST', body: JSON.stringify({username}) });
+                    const data = await res.json();
+                    userElo = data.elo || 1200;
+                    $('#user-display').text(`${username} (${userElo} Elo)`);
+                } catch(e) {}
+            }
+
+            async function fetchLeaderboard() {
+                try {
+                    const res = await fetch('api_leaderboard.php');
+                    const data = await res.json();
+                    if (data.success && data.leaderboard) {
+                        const $list = $('#leaderboard-list');
+                        $list.empty();
+                        data.leaderboard.forEach((p, index) => {
+                            let icon = '♟️';
+                            if (index === 0) icon = '👑';
+                            else if (index === 1) icon = '🥈';
+                            else if (index === 2) icon = '🥉';
+                            const safeName = $('<div>').text(p.username).html();
+                            $list.append(`<li style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #333;">
+                                <span>${icon} ${safeName}</span>
+                                <span style="color: #ff9900; font-weight: bold;">${p.elo}</span>
+                            </li>`);
+                        });
+                    }
+                } catch (e) {}
+            }
+
+            function handleGameOver(explicitResult) {
+                if (!multiplayerMode) return;
+                let result = typeof explicitResult === 'string' ? explicitResult : null;
+                if (!result) {
+                    result = 'draw';
+                    if (game.in_checkmate()) {
+                        result = game.turn() === 'w' ? 'b' : 'w';
+                    }
+                }
+                
+                $.post('api_end_match.php', JSON.stringify({ otp: currentOtp, result: result }), function(data) {
+                    if(data.success) {
+                        userElo = isHost ? data.newHost : data.newGuest;
+                        $('#user-display').text(`${username} (${userElo} Elo)`);
+                        if (!$status.text().includes('Rating updated')) {
+                            const finalCls = result === 'draw' ? 'draw' : 'checkmate';
+                            setStatus($status.text() + ` (Rating updated!)`, finalCls);
+                        }
+                    }
+                }, 'json');
+            }
+
+            function refreshMoveLog() {
+                const turn = game.history({ verbose: true });
+                let lines = [];
+                for (let i = 0; i < turn.length; i += 2) {
+                    const num = Math.floor(i / 2) + 1;
+                    const w = turn[i] ? turn[i].san : '';
+                    const b = turn[i + 1] ? turn[i + 1].san : '';
+                    lines.push(num + '. ' + w + (b ? '  ' + b : ''));
+                }
+                $log.html(lines.length > 0 ? lines.join('<br>') : '—');
+                $log.scrollTop($log[0].scrollHeight);
+            }
+
+            function updateCapturedPieces() {
+                const counts = { w: { p:0, n:0, b:0, r:0, q:0 }, b: { p:0, n:0, b:0, r:0, q:0 } };
+                const starting = { p:8, n:2, b:2, r:2, q:1 };
+                const sym = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛' };
+                
+                const bState = game.board();
+                for (let r=0; r<8; r++) {
+                    for (let c=0; c<8; c++) {
+                        const piece = bState[r][c];
+                        if (piece && piece.type !== 'k') {
+                            counts[piece.color][piece.type]++;
+                        }
+                    }
+                }
+                
+                let wCap = ''; let bCap = '';
+                for (const type of ['q','r','b','n','p']) {
+                    const wDiff = starting[type] - counts.w[type];
+                    const bDiff = starting[type] - counts.b[type];
+                    for(let i=0; i<wDiff; i++) wCap += `<span class="cap-w">${sym[type]}</span>`;
+                    for(let i=0; i<bDiff; i++) bCap += `<span class="cap-b">${sym[type]}</span>`;
+                }
+                
+                if (humanColor === 'w') {
+                    $('#captured-bottom').html(bCap);
+                    $('#captured-top').html(wCap);
+                } else {
+                    $('#captured-bottom').html(wCap);
+                    $('#captured-top').html(bCap);
+                }
+            }
+
+            function clearHighlights() {
+                $('#board .square-55d63').removeClass('highlight-dot highlight-capture highlight-selected');
+            }
+
+            function highlightLegalMoves(square) {
+                clearHighlights();
+                $('#board .square-' + square).addClass('highlight-selected');
+                const moves = game.moves({ square: square, verbose: true });
+                moves.forEach(m => {
+                    const isCapture = m.flags.includes('c') || m.flags.includes('e');
+                    $('#board .square-' + m.to).addClass(isCapture ? 'highlight-capture' : 'highlight-dot');
+                });
+            }
+
+            function checkGameOver() {
+                if (game.in_checkmate()) {
+                    const winner = game.turn() === 'w' ? 'Black' : 'White';
+                    setStatus('♛ Checkmate! ' + winner + ' wins!', 'checkmate');
+                    gameOver = true;
+                    $('#btn-abandon').text('Leave Match');
+                    return true;
+                }
+                if (game.in_draw()) {
+                    setStatus('➖ Draw', 'draw');
+                    gameOver = true;
+                    $('#btn-abandon').text('Leave Match');
+                    return true;
+                }
+                return false;
+            }
+
+            function updateCheckHighlight() {
+                $('#board .in-check').removeClass('in-check');
+                if (game.in_check()) {
+                    const turn = game.turn();
+                    const b = game.board();
+                    for (let r = 0; r < 8; r++) {
+                        for (let c = 0; c < 8; c++) {
+                            if (b[r][c] && b[r][c].type === 'k' && b[r][c].color === turn) {
+                                const sq = String.fromCharCode(97 + c) + (8 - r);
+                                $('#board .square-' + sq).addClass('in-check');
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+            function makeMove(move) {
+                try {
+                    const result = game.move(move, { sloppy: !move.from });
+                    if (!result) return false;
+                    if (result.captured) {
+                        captureSound.currentTime = 0;
+                        captureSound.play().catch(()=>{});
+                    } else {
+                        moveSound.currentTime = 0;
+                        moveSound.play().catch(()=>{});
+                    }
+                    board.position(game.fen(), true);
+                    refreshMoveLog();
+                    updateCheckHighlight();
+                    updateCapturedPieces();
+                    return result;
+                } catch (_) { return false; }
+            }
+
+            $('#board').on('click', '.square-55d63', function() {
+                if (gameOver || aiThinking || isProcessingPollMove || (broadcastMode && !isHost) || game.turn() !== humanColor) return;
+                const square = $(this).attr('data-square');
+                
+                if (selectedSquare) {
+                    const moves = game.moves({ square: selectedSquare, verbose: true });
+                    const move = moves.find(m => m.to === square);
+                    if (move) {
+                        const result = makeMove({ from: selectedSquare, to: square, promotion: 'q' });
+                        if (result) {
+                            if ((broadcastMode || multiplayerMode) && currentOtp) {
+                                $.post('make_move.php', JSON.stringify({ otp: currentOtp, move: result.san, username: username }), function() {}, 'json');
+                            }
+                            const isOver = checkGameOver();
+                            if (multiplayerMode) {
+                                if (isOver) handleGameOver();
+                                else setStatus('Opponent\'s turn');
+                            } else {
+                                aiThinking = true;
+                                setStatus('AI is thinking…', 'thinking');
+                                if (!isOver) sendToEngine();
+                            }
+                        }
+                        clearHighlights();
+                        selectedSquare = null;
+                        return;
+                    }
+                }
+                const piece = game.get(square);
+                if (piece && piece.color === humanColor) {
+                    selectedSquare = square;
+                    highlightLegalMoves(square);
+                } else { clearHighlights(); selectedSquare = null; }
+            });
+
+            // ── Stockfish Engine ──
+            function initStockfish() {
+                return new Promise((resolve) => {
+                    const wasmUrl = 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.wasm';
+                    fetch('https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.wasm.js')
+                        .then(res => res.text())
+                        .then((scriptSrc) => {
+                            const patchedSrc = scriptSrc.replace(/wasmBinaryFile="stockfish\.wasm"/, 'wasmBinaryFile="' + wasmUrl + '"');
+                            const worker = new Worker(URL.createObjectURL(new Blob([patchedSrc], { type: 'application/javascript' })));
+
+                            worker.onmessage = function (e) {
+                                const msg = e.data;
+                                if (typeof msg === 'string' && msg.includes('info depth') && msg.includes('score cp')) {
+                                    const cp = msg.match(/score cp (-?\d+)/);
+                                    if (cp) {
+                                        let score = parseInt(cp[1], 10);
+                                        score = game.turn() === 'w' ? score : -score;
+                                        let pct = 50 + (Math.max(-1000, Math.min(1000, score)) / 20);
+                                        $('#eval-bar').css('width', pct + '%');
+                                        $('#eval-text').text((score > 0 ? '+' : '') + (score / 100).toFixed(2));
+                                    }
+                                }
+
+                                if (typeof msg === 'string' && msg.startsWith('bestmove')) {
+                                    if (broadcastMode && !isHost) return;
+                                    if (game.turn() === humanColor) return;
+                                    const best = msg.split(' ')[1];
+                                    if (best && best !== '(none)') {
+                                        const parsed = makeMove(best);
+                                        if (parsed) {
+                                            // Sync AI move to spectator (host only)
+                                            if (broadcastMode && currentOtp && isHost) {
+                                                $.post('make_move.php', JSON.stringify({ otp: currentOtp, move: parsed.san, username: username }), function() {}, 'json');
+                                            }
+                                            aiThinking = false;
+                                            if (checkGameOver()) return;
+                                            setStatus(game.turn() === humanColor ? 'Your turn' : 'AI thinking…', game.turn() === humanColor ? '' : 'thinking');
+                                            if (game.turn() !== humanColor && !gameOver) {
+                                                if (broadcastMode && !isHost) return;
+                                                aiThinking = true;
+                                                sendToEngine();
+                                            } else {
+                                                updateEvaluation();
+                                            }
+                                        }
+                                    }
+                                }
+                                if (msg === 'uciok') {
+                                    worker.postMessage('setoption name Skill Level value 20');
+                                    worker.postMessage('isready');
+                                    resolve(worker);
+                                }
+                            };
+                            worker.postMessage('uci');
+                    }).catch(err => {
+                        console.error('Stockfish failed to load:', err);
+                        resolve(null);
+                        });
+                });
+            }
+
+            function sendToEngine() {
+                if (gameOver || !stockfishWorker) return;
+                if (broadcastMode && !isHost) return;
+                aiThinking = true;
+                setStatus('AI is thinking…', 'thinking');
+                stockfishWorker.postMessage('position fen ' + game.fen());
+                stockfishWorker.postMessage('go movetime 1000');
+            }
+
+            function updateEvaluation() {
+                if (!stockfishWorker || gameOver || multiplayerMode) {
+                    if (multiplayerMode) $('#eval-container').hide();
+                    return;
+                }
+                $('#eval-container').show();
+                stockfishWorker.postMessage('position fen ' + game.fen());
+                stockfishWorker.postMessage('go movetime 500');
+            }
+
+            function resetEngineAndGame(color) {
+                if (stockfishWorker) {
+                    stockfishWorker.postMessage('stop');
+                    stockfishWorker.postMessage('ucinewgame');
+                }
+                newGame(color);
+            }
+
+            function newGame(color) {
+                humanColor = color;
+                game.reset();
+                gameOver = false;
+                aiThinking = false;
+                serverChessMoveCount = 0;
+                $log.html('—');
+                if (board) {
+                    board.position(game.fen(), false);
+                    updateCheckHighlight();
+                    board.orientation(color === 'w' ? 'white' : 'black');
+                }
+
+                $('#bottom-name').text(username);
+                $('#top-name').text(multiplayerMode ? opponentUsername : (broadcastMode && !isHost ? 'Host' : 'AI Bot'));
+                $('#top-status').hide();
+                if (multiplayerMode) $('#top-status').show();
+                updateCapturedPieces();
+                clearHighlights();
+                selectedSquare = null;
+
+                const hostColorName = color === 'w' ? 'White' : 'Black';
+                const isWhite = color === 'w';
+
+                if (broadcastMode && !isHost) {
+                    setStatus('Watching match... (White to move | Host: ' + hostColorName + ')');
+                } else if (multiplayerMode) {
+                    setStatus(isWhite ? 'Your turn' : 'Opponent\'s turn');
+                } else {
+                    if (isWhite) {
+                        setStatus('Your turn');
+                    } else {
+                        aiThinking = true;
+                        setStatus('AI is thinking…', 'thinking');
+                        setTimeout(function() { sendToEngine(); }, 300);
+                    }
+                }
+                if (!aiThinking) updateEvaluation();
+            }
+
+            // ── AJAX Polling: Check for moves from server ──
+            function startPolling() {
+                stopPolling();
+                lastMoveCount = 0;
+                serverChessMoveCount = 0;
+                missedHeartbeats = 0;
+                function poll() {
+                    if (!currentOtp || (!broadcastMode && !multiplayerMode)) return;
+                    
+                    $.ajax({
+                        url: 'get_moves.php',
+                        type: 'POST',
+                        data: JSON.stringify({ otp: currentOtp, lastCount: lastMoveCount, isHost: isHost, isSpectator: broadcastMode && !isHost }),
+                        dataType: 'json',
+                        timeout: 8000
+                    }).done(function(data) {
+                        if (missedHeartbeats > 0) {
+                            missedHeartbeats = 0;
+                            $('#reconnect-toast').css('display', 'none');
+                        }
+                        if (!data.success) return;
+
+                        // Check if guest joined
+                        if (isHost && data.guest_username) {
+                            if (!opponentUsername || opponentUsername === 'Opponent') opponentUsername = data.guest_username;
+                            
+                            if (broadcastMode) {
+                                $('#waiting-msg').text('Spectator (' + data.guest_username + ') joined!');
+                                $broadcastStatus.text('Broadcasting to ' + data.guest_username).show();
+                            } else if (multiplayerMode && data.status === 'playing') {
+                                $('#waiting-msg').text('Opponent (' + data.guest_username + ') joined!');
+                                if ($('#lobby-screen').hasClass('active')) {
+                                    startGameView();
+                                    setStatus('Playing against ' + opponentUsername);
+                                }
+                            }
+                        }
+
+                        if (typeof data.count === 'number' && data.count < lastMoveCount) {
+                            if (!isHost && broadcastMode) {
+                                resetEngineAndGame(humanColor);
+                            }
+                            lastMoveCount = 0;
+                        }
+
+                        // Apply new moves from partner
+                        if (data.moves && data.moves.length > 0) {
+                            isProcessingPollMove = true;
+                            for (let i = 0; i < data.moves.length; i++) {
+                                const m = data.moves[i];
+
+                                if (typeof m !== 'string') continue;
+                                
+                                if (m === '__RESTART') {
+                                    if (!isHost && broadcastMode) {
+                                        resetEngineAndGame(humanColor);
+                                    }
+                                    continue;
+                                }
+
+                                if (m.startsWith('__COLOR_')) {
+                                    if (!isHost && broadcastMode) {
+                                        const c = m.split('_')[2];
+                                        resetEngineAndGame(c);
+                                    }
+                                    continue;
+                                }
+
+                                if (m.startsWith('__RESIGN_')) {
+                                    const resignedColor = m.split('_')[2];
+                                    const winner = resignedColor === 'w' ? 'b' : 'w';
+                                    const winnerName = winner === 'w' ? 'White' : 'Black';
+                                    setStatus('Match abandoned. ' + winnerName + ' wins!', 'checkmate');
+                                    gameOver = true;
+                                    $('#btn-abandon').text('Leave Match');
+                                    if (multiplayerMode) handleGameOver(winner);
+                                    continue;
+                                }
+
+                                if (m.startsWith('__DISCONNECT_')) {
+                                    const droppedColor = m.split('_')[2];
+                                    if (droppedColor === humanColor) {
+                                        setStatus('You lost connection. Match forfeited.', 'checkmate');
+                                    } else {
+                                        setStatus('Opponent disconnected. You win!', 'checkmate');
+                                        if (multiplayerMode) handleGameOver(humanColor); // Reward remaining player
+                                    }
+                                    gameOver = true;
+                                    $('#btn-abandon').text('Leave Match');
+                                    continue;
+                                }
+
+                                const localHistory = game.history();
+                                if (serverChessMoveCount < localHistory.length) {
+                                    if (localHistory[serverChessMoveCount] === m) {
+                                        serverChessMoveCount++;
+                                        continue;
+                                    } else {
+                                        while (game.history().length > serverChessMoveCount) {
+                                            game.undo();
+                                        }
+                                        board.position(game.fen(), false);
+                                        updateCheckHighlight();
+                                        refreshMoveLog();
+                                    }
+                                }
+
+                                const parsed = makeMove(m);
+                                if (parsed) {
+                                    serverChessMoveCount++;
+                                    aiThinking = false;
+                                    const isOver = checkGameOver();
+                                    
+                                    if (broadcastMode && !isHost) {
+                                        if (!isOver) {
+                                            const turnName = game.turn() === 'w' ? 'White' : 'Black';
+                                            const hostColorName = humanColor === 'w' ? 'White' : 'Black';
+                                            setStatus('Watching match... (' + turnName + ' to move | Host: ' + hostColorName + ')');
+                                        }
+                                    } else if (multiplayerMode) {
+                                        if (isOver) {
+                                            handleGameOver();
+                                        } else {
+                                            setStatus(game.turn() === humanColor ? 'Your turn' : 'Opponent\'s turn');
+                                        }
+                                    } else if (game.turn() !== humanColor && !isOver) {
+                                        aiThinking = true;
+                                        setStatus('AI is thinking…', 'thinking');
+                                        sendToEngine();
+                                    } else if (!isOver) {
+                                        setStatus('Your turn');
+                                    }
+                                }
+                            }
+                            // Update lastMoveCount to server total
+                            if (data.count > lastMoveCount) lastMoveCount = data.count;
+                            isProcessingPollMove = false;
+
+                            if (broadcastMode && !isHost) {
+                                updateEvaluation();
+                            }
+                        }
+                    }).fail(function() {
+                        missedHeartbeats++;
+                        if (missedHeartbeats >= 2) {
+                            $('#reconnect-toast').css('display', 'flex');
+                        }
+                        }).always(function() {
+                            if (currentOtp && (broadcastMode || multiplayerMode)) {
+                                pollTimer = setTimeout(poll, 1500);
+                            }
+                    });
+                }
+                poll();
+            }
+
+            function stopPolling() {
+                if (pollTimer) {
+                    clearTimeout(pollTimer);
+                    pollTimer = null;
+                }
+                missedHeartbeats = 0;
+                $('#reconnect-toast').css('display', 'none');
+            }
+
+            async function init() {
+                fetchProfile();
+                fetchLeaderboard();
+                stockfishWorker = await initStockfish();
+                $overlay.addClass('hidden');
+                $(window).on('resize', function() { if (board) board.resize(); });
+            }
+
+            // ── Lobby Controls ──
+            $('#btn-solo').on('click', function() {
+                broadcastMode = false;
+                multiplayerMode = false;
+                currentOtp = null;
+                stopPolling();
+                startGameView();
+            });
+
+            $('#btn-multi-friend').on('click', function() {
+                const btn = $(this);
+                btn.prop('disabled', true).text('Creating...');
+                $.post('create_room.php', JSON.stringify({ username: username, isBroadcast: false }), function(data) {
+                    if (data.success) {
+                        $('#generated-otp').text(data.otp);
+                        $('#otp-instruction').text('Share this OTP with your friend to play:');
+                        $('#waiting-msg').text('Waiting for friend to join...');
+                        $('#otp-section').show();
+                        $('#join-section').hide();
+                        $('#watch-section').hide();
+                        $('#btn-start-hosted').hide();
+                        $('#btn-cancel-room').text('Cancel Match').show();
+                        $('.lobby-buttons').hide();
+                        currentOtp = data.otp;
+                        isHost = true;
+                        humanColor = 'w';
+                        multiplayerMode = true;
+                        broadcastMode = false;
+                        startPolling();
+                    }
+                }, 'json').fail(function() {
+                    alert('Failed to create room.');
+                }).always(function() {
+                    btn.prop('disabled', false).text('Create Room');
+                });
+            });
+
+            $('#btn-multi-random').on('click', function() {
+                const btn = $(this);
+                btn.prop('disabled', true).text('Searching...');
+                $.post('api_matchmake.php', JSON.stringify({ username: username }), function(data) {
+                    if (data.status === 'joined') {
+                        currentOtp = data.otp;
+                        isHost = false;
+                        humanColor = data.color;
+                        multiplayerMode = true;
+                        broadcastMode = false;
+                        opponentUsername = data.opponent;
+                        startPolling();
+                        startGameView();
+                        setStatus('Playing against ' + opponentUsername);
+                    } else if (data.status === 'waiting') {
+                        currentOtp = data.otp;
+                        isHost = true;
+                        humanColor = 'w';
+                        multiplayerMode = true;
+                        broadcastMode = false;
+                        opponentUsername = null;
+                        $('#otp-section').show();
+                        $('#otp-instruction').text('Queueing for random match...');
+                        $('#generated-otp').text('Searching...');
+                        $('#waiting-msg').text('Waiting for opponent...');
+                        $('#btn-start-hosted').hide();
+                        $('#btn-cancel-room').text('Cancel Search').show();
+                        $('.lobby-buttons').hide();
+                        $('#join-section').hide();
+                        $('#watch-section').hide();
+                        startPolling();
+                    }
+                }, 'json').fail(function() {
+                    alert('Failed to matchmake.');
+                }).always(function() {
+                    btn.prop('disabled', false).text('Find Random Match');
+                });
+            });
+
+            $('#btn-create-broadcast').on('click', function() {
+                const btn = $(this);
+                btn.prop('disabled', true).text('Creating...');
+                $.post('create_room.php', JSON.stringify({ username: username, isBroadcast: true }), function(data) {
+                    if (data.success) {
+                        $('#generated-otp').text(data.otp);
+                        $('#otp-instruction').text('Share this OTP with a friend to watch:');
+                        $('#waiting-msg').text('Waiting for spectator to join...');
+                        $('#otp-section').show();
+                        $('#join-section').hide();
+                        $('#watch-section').hide();
+                        $('#btn-start-hosted').show();
+                        $('#btn-cancel-room').text('Cancel Broadcast').show();
+                        $('.lobby-buttons').hide();
+                        currentOtp = data.otp;
+                        isHost = true;
+                        broadcastMode = true;
+                        multiplayerMode = false;
+                        // Start polling for guest to join
+                        startPolling();
+                    }
+                }, 'json').fail(function() {
+                    alert('Failed to create room. Check server connection.');
+                }).always(function() {
+                    btn.prop('disabled', false).text('Create Broadcast');
+                });
+            });
+
+            $('#btn-cancel-room').on('click', function() {
+                if (currentOtp) {
+                    $.post('api_cancel_search.php', JSON.stringify({ otp: currentOtp, username: username }));
+                }
+                stopPolling();
+                currentOtp = null;
+                multiplayerMode = false;
+                broadcastMode = false;
+                $('#otp-section').hide();
+                $('.lobby-buttons').show();
+                $('#join-section').hide();
+                $('#watch-section').hide();
+                $(this).hide();
+            });
+
+            $('#btn-start-hosted').on('click', function() {
+                startGameView();
+                setStatus('Broadcast Mode: Playing live');
+                if ($broadcastStatus.text() === '') {
+                    $broadcastStatus.text('Broadcasting (waiting for spectator...)');
+                }
+                $broadcastStatus.show();
+            });
+
+            $('#btn-join-multi').on('click', function() {
+                const otp = $('#join-otp').val().trim();
+                if (!otp || otp.length < 6) return alert('Enter valid 6-digit OTP');
+                const btn = $(this);
+                btn.prop('disabled', true).text('Joining...');
+                $.post('join_room.php', JSON.stringify({ otp: otp, username: username }), function(data) {
+                    if (data.success) {
+                        currentOtp = otp;
+                        isHost = false;
+                        humanColor = 'b';
+                        multiplayerMode = true;
+                        broadcastMode = false;
+                        opponentUsername = data.host;
+                        startPolling();
+                        startGameView();
+                        setStatus('Playing against ' + opponentUsername);
+                    }
+                }, 'json').fail(function(xhr) {
+                    alert(xhr.responseJSON ? xhr.responseJSON.message : 'Failed to join');
+                }).always(function() {
+                    btn.prop('disabled', false).text('Join Match');
+                });
+            });
+
+            $('#btn-join-broadcast').on('click', function() {
+                const otp = $('#watch-otp').val().trim();
+                if (!otp || otp.length < 6) return alert('Enter valid 6-digit OTP');
+                const btn = $(this);
+                btn.prop('disabled', true).text('Joining...');
+                $.post('join_room.php', JSON.stringify({ otp: otp, username: username, isSpectator: true }), function(data) {
+                    if (data.success) {
+                        currentOtp = otp;
+                        isHost = false;
+                        broadcastMode = true;
+                        multiplayerMode = false;
+                        $broadcastStatus.text('Watching ' + data.host).show();
+                        startPolling();
+                        startGameView();
+                        setStatus('Watching match ' + otp);
+                    }
+                }, 'json').fail(function(xhr) {
+                    const msg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to join room';
+                    alert(msg);
+                }).always(function() {
+                    btn.prop('disabled', false).text('Watch Broadcast');
+                });
+            });
+
+            $('#btn-show-join').on('click', function() {
+                $('#watch-section').slideUp();
+                $('#join-section').slideToggle();
+            });
+
+            $('#btn-show-watch').on('click', function() {
+                $('#join-section').slideUp();
+                $('#watch-section').slideToggle();
+            });
+
+            function startGameView() {
+                $('#lobby-screen').removeClass('active');
+                $('#game-screen').addClass('active');
+
+                if (broadcastMode && !isHost) {
+                    $('.controls').show();
+                    $('#btn-white, #btn-black, #btn-restart').hide();
+                    $('#btn-abandon').text('Exit to Lobby').show();
+                } else if (multiplayerMode) {
+                    $('.controls').show();
+                    $('#btn-white, #btn-black, #btn-restart').hide();
+                    $('#btn-abandon').text('⚑ Abandon Match').show();
+                } else {
+                    $('.controls').show();
+                    $('#btn-white, #btn-black, #btn-restart').show();
+                    $('#btn-abandon').text('Exit to Lobby').show();
+                }
+
+                if (!board) {
+                    board = Chessboard('board', {
+                        draggable: false,
+                        position: 'start',
+                        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+                    });
+                }
+                resetEngineAndGame(humanColor);
+            }
+
+            $('#btn-white').on('click', function() {
+                resetEngineAndGame('w');
+                // Sync color change in broadcast
+                if (broadcastMode && currentOtp && isHost) {
+                    $.post('make_move.php', JSON.stringify({ otp: currentOtp, move: '__COLOR_w', username: username }), function() {}, 'json');
+                }
+            });
+
+            $('#btn-black').on('click', function() {
+                resetEngineAndGame('b');
+                if (broadcastMode && currentOtp && isHost) {
+                    $.post('make_move.php', JSON.stringify({ otp: currentOtp, move: '__COLOR_b', username: username }), function() {}, 'json');
+                }
+            });
+
+            $('#btn-restart').on('click', function() {
+                resetEngineAndGame(humanColor);
+                if (broadcastMode && currentOtp) {
+                    $.post('make_move.php', JSON.stringify({ otp: currentOtp, move: '__RESTART', username: username }), function() {}, 'json');
+                }
+            });
+
+            $('#btn-abandon').on('click', function() {
+                if (!multiplayerMode || gameOver) {
+                    // Game is over or it's single player, act as a "Leave Match" / "Exit" button
+                    if (stockfishWorker) stockfishWorker.postMessage('stop');
+                    if (currentOtp && isHost && broadcastMode) {
+                        $.post('api_cancel_search.php', JSON.stringify({ otp: currentOtp, username: username }));
+                    }
+                    stopPolling();
+                    currentOtp = null;
+                    multiplayerMode = false;
+                    broadcastMode = false;
+                    $('#game-screen').removeClass('active');
+                    $('#lobby-screen').addClass('active');
+                    $('#otp-section').hide();
+                    $('.lobby-buttons').show();
+                    $('#join-section').hide();
+                    $('#watch-section').hide();
+                    return;
+                }
+
+                if (!confirm('Are you sure you want to abandon the match? This will count as a loss.')) return;
+                if (currentOtp && multiplayerMode) {
+                    $.post('make_move.php', JSON.stringify({ otp: currentOtp, move: '__RESIGN_' + humanColor, username: username }), function() {}, 'json');
+                }
+            });
+
+            $('#btn-logout').on('click', function(e) {
+                e.preventDefault();
+                localStorage.removeItem('chess_user');
+                window.location.href = 'index.html';
+            });
+
+            init();
+        })();
+    </script>
+</body>
+</html>
